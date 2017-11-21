@@ -1,4 +1,4 @@
-# Decision-Trees
+# Decision Trees (Information Gain, Gini Index, CART)
 Implementation of the three measures (Information Gain, CART, Gini Index).
 Datasets included: train.txt, and test.txt
 Each row contains 11 values - the first 10 are attributes (a mix of numeric and categorical translated to numeric (ex: {T,F} = {0,1}), and the final being the true class of that observation. The load function separates class from data.

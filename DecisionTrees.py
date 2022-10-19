@@ -1,9 +1,44 @@
 import numpy as np
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.tree import DecisionTreeClassifier
 
-def column(matrix, i):
-    return [row[i] for row in matrix]
+def entropy(D_XY):
 
+	n = D_XY.shape[0]
+	if n == 0:
+		return 0
+	else:
+		n1 = D_XY[[D_XY[:, -1] == 0]].shape[0]
+		n2 = D_XY[[D_XY[:, -1] == 1]].shape[0]
+		p1 = n1 / n
+		p2 = n2 / n
+
+		h = -(p1 * safe_log2(p1) + p2 * safe_log2(p2))
+
+		return h
+
+
+def split_entropy(Dy, Dn):
+	ny = Dy.shape[0]
+	nn = Dn.shape[0]
+	n = ny + nn
+	h = (ny/n) * entropy(Dy) + (nn/n) * entropy(Dn)
+
+	return h
+
+def split_data(D, index, value):
+	# convert tuple D to ndarray D_XY, then split into (Dy, Dn)
+	D_XY = np.hstack(D)
+	Dy = D_XY[D_XY[:, index] <= value]
+	Dn = D_XY[D_XY[:, index] > value]
+	return D_XY, Dy, Dn
+
+def safe_log2(x):
+	# handles the case where x = 0
+	if x == 0:
+		return 0
+	else:
+		return np.log2(x)
+    
 
 def IG(D, index, value):
     """Compute the Information Gain of a split on attribute index at value
@@ -17,64 +52,21 @@ def IG(D, index, value):
     Returns:
         The value of the Information Gain for the given split
     """
-    # This is to get columns
-    # D[D[:, index] <= value], D[D[:, index] > value], index)
 
+    D_XY, Dy, Dn = split_data(D, index, value)
+	h = entropy(D_XY)
+	h_split = split_entropy(Dy, Dn)
 
-    colXofData = column(D[0], index)
-    columnofNums = D[1]
-    classesZero = []
-    classesOne = []
-    dataZero = []
-    dataOne = []
+	return h - h_split
 
-    OriginaltrueCount = 0
-    OriginalfalseCount = 0
-    for x in range(0, len(D[1])):
-        if (D[1][x] == 0):
-            OriginaltrueCount += 1
-        elif (D[1][x] == 1):
-            OriginalfalseCount += 1
-
-    op1 = OriginaltrueCount / (OriginaltrueCount + OriginalfalseCount)
-    op2 = OriginalfalseCount / (OriginaltrueCount + OriginalfalseCount)
-    XY = - (op1 * np.log2(op1) + ((op2) * np.log2((op2))))
-    print("This is the Entropy of the entire dataset: {}".format(XY))
-
-    # This is used for the split-entropy
-    for x in range(0, len(columnofNums)):
-        if(colXofData[x] >= value):
-            dataZero.append(colXofData[x])
-            classesZero.append(0)
-        elif(colXofData[x] < value):
-            dataOne.append(colXofData[x])
-            classesOne.append(1)
-
-
-    trueCount = len(dataZero)
-    falseCount = len(dataOne)
-    datasetNP = np.array(colXofData)
-    classesNP = np.array(columnofNums)
-    Yes = 0
-    No = 0
-    Yes = len(classesZero)
-    No = len(classesOne)
-
-    # Calculate entropy of dataset
-        # p1 represents Dy
-        # p2 represents Dn
-    p1 = trueCount / (trueCount + falseCount)
-    p2 = falseCount / (trueCount + falseCount)
-
-    # Calculate Split-Entropy for dataset
-    DYDN = - (((Yes)/(Yes+No))*p1*np.log2(p1) + ((No)/(Yes+No)) * p2*np.log2(p2))
-    #print("This is the Split-Entropy: {}".format(DYDN))
-
-    #Calculate Information Gain
-    informationGain = XY - DYDN
-    print("This is the Information Gain: {}".format(informationGain))
-    return informationGain
-
+# Create helper function to calculate Gini index of one partition
+def gini(Di):
+    
+	n = Di.shape[0]
+	n0 = Di[Di[:, -1] == 0].shape[0]
+	n1 = Di[Di[:, -1] == 1].shape[0]
+    
+	return 1 - (n0/n)**2 - (n1/n)**2
 
 def G(D, index, value):
     """Compute the Gini index of a split on attribute index at value
@@ -89,47 +81,14 @@ def G(D, index, value):
         The value of the Gini index for the given split
     """
 
-    trueCount = 0
-    falseCount = 0
-    for x in range(0, len(D[1])):
-        if (D[1][x] == 0):
-            trueCount += 1
-        elif (D[1][x] == 1):
-            falseCount += 1
+    D_XY, Dy, Dn = split_data(D, index, value)
 
-    p1 = trueCount / (trueCount + falseCount)
-    p2 = falseCount / (trueCount + falseCount)
+	n = D[0].shape[0]
+	ny = Dy.shape[0]
+	nn = Dn.shape[0]
 
-    colXofData = column(D[0], index)
-    columnofNums = D[1]
-    classesZero = []
-    classesOne = []
-    dataZero = []
-    dataOne = []
 
-    for x in range(0, len(columnofNums)):
-        if(colXofData[x] >= value):
-            dataZero.append(colXofData[x])
-            classesZero.append(0)
-        elif(colXofData[x] < value):
-            dataOne.append(colXofData[x])
-            classesOne.append(1)
-
-    trueCount = len(dataZero)
-    falseCount = len(dataOne)
-
-    Yes = 0
-    No = 0
-    Yes = len(classesZero)
-    No = len(classesOne)
-    yesPercent = Yes/(Yes+No)
-    noPercent = No/(Yes+No)
-
-    GiniDY = (yesPercent)*(1 - (yesPercent*yesPercent))
-    GiniDN = (noPercent)*(1 - (noPercent*noPercent))
-    GiniIndex = GiniDY + GiniDN
-    print("This is the Gini Index: {}".format(GiniIndex))
-    return GiniIndex
+	return (ny/n) * gini(Dy) + (nn/n) * gini(Dn)
 
 def CART(D, index, value):
     """Compute the CART measure of a split on attribute index at value
@@ -143,45 +102,26 @@ def CART(D, index, value):
     Returns:
         The value of the CART measure for the given split
     """
-    trueCount = 0
-    falseCount = 0
-    for x in range(0, len(D[1])):
-        if (D[1][x] == 0):
-            trueCount += 1
-        elif (D[1][x] == 1):
-            falseCount += 1
+    D_XY, Dy, Dn = split_data(D, index, value)
 
-    p1 = trueCount / (trueCount + falseCount)
-    p2 = falseCount / (trueCount + falseCount)
+	n = D[0].shape[0]
+	ny = Dy.shape[0]
+	nn = Dn.shape[0]
 
-    colXofData = column(D[0], index)
-    columnofNums = D[1]
-    classesZero = []
-    classesOne = []
-    dataZero = []
-    dataOne = []
+	p_0_Dy = Dy[Dy[:,-1] == 0].shape[0] / ny
+	p_1_Dy = Dy[Dy[:,-1] == 1].shape[0] / ny
 
-    for x in range(0, len(columnofNums)):
-        if (colXofData[x] >= value):
-            dataZero.append(colXofData[x])
-            classesZero.append(0)
-        elif (colXofData[x] < value):
-            dataOne.append(colXofData[x])
-            classesOne.append(1)
+	p_0_Dn = Dn[Dn[:,-1] == 0].shape[0] / nn
+	p_1_Dn = Dn[Dn[:,-1] == 1].shape[0] / nn
 
-    trueCount = len(dataZero)
-    falseCount = len(dataOne)
-    Yes = 0
-    No = 0
+	c0_separation = abs(p_0_Dy - p_0_Dn)
+	c1_separation = abs(p_1_Dy - p_1_Dn)
 
-    Yes = len(classesZero)
-    No = len(classesOne)
-    yesPercent = Yes / (Yes + No)
-    noPercent = No / (Yes + No)
+	total_separation = c0_separation + c1_separation
 
-    CARTMeasure = 2*(yesPercent*noPercent)*((abs(p1 - p2) + (abs(p1-p2))))
-    print("This is the CART: {}".format(CARTMeasure))
-    return CART
+	return 2 * (ny/n) * (nn/n) * total_separation
+
+
 def bestSplit(D, criterion):
     """Computes the best split for dataset D using the specified criterion
 
@@ -193,179 +133,46 @@ def bestSplit(D, criterion):
         A tuple (i, value) where i is the index of the attribute to split at value
     """
 
-    #functions are first class objects in python, so let's refer to our desired criterion by a single name
-    if(criterion == "IG"):
-        infoGainList = []
-        indexlist = []
-        valuelist = []
-        columnofNums = D[1]
+    if criterion == "IG":
+		criterion_func = IG
+	elif criterion == "GINI":
+		criterion_func = G
+	elif criterion == "CART":
+		criterion_func = CART
 
-        for index in range(0, 10):
-            colXofData = column(D[0], index)
-            classesZero = []
-            classesOne = []
-            dataZero = []
-            dataOne = []
-            OriginaltrueCount = 0
-            OriginalfalseCount = 0
-            for x in range(0, len(D[1])):
-                if (D[1][x] == 0):
-                    OriginaltrueCount += 1
-                elif (D[1][x] == 1):
-                    OriginalfalseCount += 1
-            for value in range(int(min(colXofData)), int(max(colXofData))):
-                op1 = OriginaltrueCount / (OriginaltrueCount + OriginalfalseCount)
-                op2 = OriginalfalseCount / (OriginaltrueCount + OriginalfalseCount)
-                XY = - (op1 * np.log2(op1) + ((op2) * np.log2((op2))))
-                #print("This is the Entropy of the entire dataset: {}".format(XY))
+	X = D[0]
+	possible_splits = []
 
-                # This is used for the split-entropy
-                for x in range(0, len(colXofData)):
-                    if (colXofData[x] >= value):
-                        dataZero.append(colXofData[x])
-                        classesZero.append(0)
-                    elif (colXofData[x] < value):
-                        dataOne.append(colXofData[x])
-                        classesOne.append(1)
-
-                trueCount = len(dataZero)
-                falseCount = len(dataOne)
-                Yes = 0
-                No = 0
-                Yes = len(classesZero)
-                No = len(classesOne)
-                if (Yes > 0 and No > 0):
-                    #print(Yes)
-                    #print(No)
-                    # Calculate entropy of dataset
-                    # p1 represents Dy
-                    # p2 represents Dn
-                    p1 = trueCount / (trueCount + falseCount)
-                    p2 = falseCount / (trueCount + falseCount)
-
-                    # Calculate Split-Entropy for dataset
-                    DYDN = - (((Yes) / (Yes + No)) * p1 * np.log2(p1) + ((No) / (Yes + No)) * p2 * np.log2(p2))
-                    #print("This is the Split-Entropy: {}".format(DYDN))
-
-                    # Calculate Information Gain
-                    informationGain = XY - DYDN
-                    infoGainList.append(informationGain)
-                    indexlist.append(index)
-                    valuelist.append(value)
-                    #print("This is the Information Gain: {}".format(informationGain))
-                    #print("This is the index: {}".format(index))
-                    #print("This is the value: {}".format(value))
-        infoGain = infoGainList.index(max(infoGainList))
-        #print(infoGainList[infoGain])
-        i = indexlist[infoGain]
-        value = valuelist[infoGain]
-        return (i, value)
+	# iterate over each column in X (D[0])
+	for i in range(0,10):
+		# sort the column being considered, then filter out duplicate values
+		column = np.sort(X[:, i]).T
+		unique_values = np.unique(column)
+		n_unique = unique_values.shape[0]
+		#print("column ", i, ": ", column.shape[0], "unique: ", n_unique)
 
 
-    if(criterion == "GINI"):
-        trueCount = 0
-        falseCount = 0
-        giniList = []
-        indexlist = []
-        valuelist = []
-        for x in range(0, len(D[1])):
-            if (D[1][x] == 0):
-                trueCount += 1
-            elif (D[1][x] == 1):
-                falseCount += 1
-            p1 = trueCount / (trueCount + falseCount)
-            p2 = falseCount / (trueCount + falseCount)
+		# iterate through each pair of values, finding midpoint between each
+		for j in range(0, n_unique - 1):
+			# calculate midpoint between each pair
+			midpoint = (unique_values[j] + unique_values[j+1])/2
+			possible_splits.append((i, midpoint))
 
-        for index in range(0, 10):
-            colXofData = column(D[0], index)
-            columnofNums = D[1]
-            classesZero = []
-            classesOne = []
-            dataZero = []
-            dataOne = []
+	for split in possible_splits:
+		#print(split, criterion, "=", criterion_func(D, split[0], split[1]))
+		0
 
-            for value in range(int(min(colXofData)), int(max(colXofData))):
-                if (colXofData[x] >= value):
-                    dataZero.append(colXofData[x])
-                    classesZero.append(0)
-                elif (colXofData[x] < value):
-                    dataOne.append(colXofData[x])
-                    classesOne.append(1)
+	# query list for best split based on the criterion
+	if criterion == "GINI":
+		# minimize Gini index
+		best_split = min(possible_splits, key=lambda s: criterion_func(D, s[0], s[1]))
 
-                trueCount = len(dataZero)
-                falseCount = len(dataOne)
-                Yes = 0
-                No = 0
-                Yes = len(classesZero)
-                No = len(classesOne)
-                if Yes > 0 and No > 0:
-                    yesPercent = Yes / (Yes + No)
-                    noPercent = No / (Yes + No)
+	else:
+		# maximize IG and CART index
+		best_split = max(possible_splits, key=lambda s: criterion_func(D, s[0], s[1]))
 
-                    GiniDY = (yesPercent) * (1 - (yesPercent * yesPercent))
-                    GiniDN = (noPercent) * (1 - (noPercent * noPercent))
-                    GiniIndex = GiniDY + GiniDN
-                    giniList.append(GiniIndex)
-                    indexlist.append(index)
-                    valuelist.append(value)
-                    #print("This is the Gini Index: {}".format(GiniIndex))
-                    #print("This is the index: {}".format(index))
-                    #print("This is the value: {}".format(value))
-        Gini = giniList.index(min(giniList))
-        i = indexlist[Gini]
-        value = valuelist[Gini]
-        return (i, value)
-
-    if(criterion == "CART"):
-        trueCount = 0
-        falseCount = 0
-        CARTList = []
-        indexlist = []
-        valuelist = []
-        for x in range(0, len(D[1])):
-            if (D[1][x] == 0):
-                trueCount += 1
-            elif (D[1][x] == 1):
-                falseCount += 1
-
-        p1 = trueCount / (trueCount + falseCount)
-        p2 = falseCount / (trueCount + falseCount)
-        for index in range(0, 10):
-            colXofData = column(D[0], index)
-            columnofNums = D[1]
-            classesZero = []
-            classesOne = []
-            dataZero = []
-            dataOne = []
-
-            for value in range(int(min(colXofData)), int(max(colXofData))):
-                if (colXofData[x] >= value):
-                    dataZero.append(colXofData[x])
-                    classesZero.append(0)
-                elif (colXofData[x] < value):
-                    dataOne.append(colXofData[x])
-                    classesOne.append(1)
-                trueCount = len(dataZero)
-                falseCount = len(dataOne)
-                truePercent = trueCount/(trueCount+falseCount)
-                falsePercent = falseCount/(trueCount+falseCount)
-                Yes = 0
-                No = 0
-                Yes = len(classesZero)
-                No = len(classesOne)
-                if Yes > 0 and No > 0:
-                    yesPercent = Yes / (Yes + No)
-                    noPercent = No / (Yes + No)
-                    CARTMeasure = 2 * (truePercent * falsePercent) * ((abs(yesPercent - noPercent) + (abs(yesPercent - noPercent))))
-                    #print("This is the CART: {}".format(CARTMeasure))
-                    CARTList.append(CARTMeasure)
-                    indexlist.append(index)
-                    valuelist.append(value)
-        Cartnum = CARTList.index(max(CARTList))
-        #print(CARTList[Cartnum])
-        i = indexlist[Cartnum]
-        value = valuelist[Cartnum]
-        return (i, value)
+	print("Best split: ", criterion, best_split, criterion_func(D, best_split[0], best_split[1]))
+	return best_split
 
 def load(filename):
     """Loads filename as a dataset. Assumes the last column is classes, and 
@@ -379,29 +186,12 @@ def load(filename):
         where X[i] comes from the i-th row in filename; y is a list or ndarray of 
         the classes of the observations, in the same order
     """
-    with open(filename) as f:
-        dataset = f.readlines()
-    dataset = [x.strip().split() for x in dataset]
-    dataset = [[float((float(j))) for j in i] for i in dataset]
-    for x in range(0, len(dataset)):
-        dataset[x][0] = int(dataset[x][0])
-        dataset[x][1] = int(dataset[x][1])
-        dataset[x][2] = int(dataset[x][2])
-        dataset[x][3] = int(dataset[x][3])
-        dataset[x][4] = int(dataset[x][4])
-        dataset[x][5] = int(dataset[x][5])
-        #dataset[x][6] = int(dataset[x][6])
-        dataset[x][7] = int(dataset[x][7])
-        dataset[x][8] = int(dataset[x][8])
-        dataset[x][9] = int(dataset[x][9])
-        dataset[x][10] = int(dataset[x][10])
+    raw_file = np.genfromtxt(filename, delimiter=",")
+    X = raw_file[:, :-1]
+	y = raw_file[:, -1:]
+	D = (X, y.astype(int))
 
-    classes = []
-    for x in range(0, len(dataset)):
-        classes.append(dataset[x][10])
-        dataset[x] = dataset[x][:-1]
-    X = (dataset, classes)
-    return X
+	return D
 
 def classifyIG(train, test):
     """Builds a single-split decision tree using the Information Gain criterion
@@ -414,26 +204,18 @@ def classifyIG(train, test):
     Returns:
         A list of predicted classes for observations in test (in order)
     """
-    X = bestSplit(train, "IG")
-    bestSplitColTrain = X[0]
-    bestSplitValueTrain = X[1]
-    allValuesTrain = train[0] # list of lists
-    allClassesTrain = train[1]
+    
+    split_index, split_value = bestSplit(train, "IG")
+	y_predict = []
+    
+	for Xi in test[0]:
+		if Xi[split_index] <= split_value:
 
-    allClassesTest = test[1]
+			y_predict.append(0)
+		else:
+			y_predict.append(1)
 
-    data = []
-    classes = []
-
-    colXofData = column(test[0], bestSplitColTrain)
-    for x in range(0, len(allClassesTest)):
-        if(colXofData[x] >= bestSplitValueTrain):
-            data.append(colXofData[x])
-            classes.append(0)
-        elif(colXofData[x] < bestSplitValueTrain):
-            data.append(colXofData[x])
-            classes.append(1)
-    return(classes)
+	return y_predict
 
 
 def classifyG(train, test):
@@ -447,26 +229,18 @@ def classifyG(train, test):
     Returns:
         A list of predicted classes for observations in test (in order)
     """
-    X = bestSplit(train, "GINI")
-    bestSplitColTrain = X[0]
-    bestSplitValueTrain = X[1]
-    allValuesTrain = train[0]  # list of lists
-    allClassesTrain = train[1]
+    
+	split_index, split_value = bestSplit(train, "GINI")
 
-    allClassesTest = test[1]
+	# predict
+	y_predict = []
+	for Xi in test[0]:
+		if Xi[split_index] <= split_value:
+			y_predict.append(0)
+		else:
+			y_predict.append(1)
 
-    data = []
-    classes = []
-
-    colXofData = column(test[0], bestSplitColTrain)
-    for x in range(0, len(allClassesTest)):
-        if (colXofData[x] >= bestSplitValueTrain):
-            data.append(colXofData[x])
-            classes.append(0)
-        elif (colXofData[x] < bestSplitValueTrain):
-            data.append(colXofData[x])
-            classes.append(1)
-    return(classes)
+	return y_predict
 
 
 def classifyCART(train, test):
@@ -480,26 +254,32 @@ def classifyCART(train, test):
     Returns:
         A list of predicted classes for observations in test (in order)
     """
-    X = bestSplit(train, "CART")
-    bestSplitColTrain = X[0]
-    bestSplitValueTrain = X[1]
-    allValuesTrain = train[0]  # list of lists
-    allClassesTrain = train[1]
+    split_index, split_value = bestSplit(train, "CART")
 
-    allClassesTest = test[1]
+	y_predict=[]
+	for Xi in test[0]:
+		if Xi[split_index] >= split_value:
+			y_predict.append(0)
+		else:
+			y_predict.append(1)
 
-    data = []
-    classes = []
+	return y_predict
 
-    colXofData = column(test[0], bestSplitColTrain)
-    for x in range(0, len(allClassesTest)):
-        if (colXofData[x] >= bestSplitValueTrain):
-            data.append(colXofData[x])
-            classes.append(0)
-        elif (colXofData[x] < bestSplitValueTrain):
-            data.append(colXofData[x])
-            classes.append(1)
-    return (classes)
+def calculate_accuracy(y_predict, y_actual):
+	"""
+	Args:
+	    y_predict: list
+	    y_actual:  list or array-like
+	Returns:
+		percentage of classications made correctly
+	"""
+	n = len(y_predict)
+	n_correct = 0
+	for i in range(0, len(y_predict)):
+		if y_predict[i] == y_actual[i]:
+			n_correct += 1
+
+	return n_correct / n
 
 def main():
     """This portion of the program will run when run only when main() is called.
@@ -508,22 +288,20 @@ def main():
     This way, when you <import HW2>, no code is run - only the functions you
     explicitly call.
     """
-    file = load('train.txt')
-    fileTest = load('test.txt')
-    IG(file, 1, 21)
-    G(file, 8, 6)
-    CART(file, 5, 8)
-    print("The Information Gain's best split is: {}".format(bestSplit(file, "IG")))
-    print("The Gini Index's best split is: {}".format(bestSplit(file, "GINI")))
-    print("The CART's best split is: {}".format(bestSplit(file, "CART")))
+    train = load("train.txt")
+	test = load("test.txt")
 
-    print("This is the original Test classification: {}".format(fileTest[1]))
-    print("classifyIG:\t\t\t\t\t\t\t\t  {}".format(classifyIG(file, fileTest)))
-    print("classifyG:\t\t\t\t\t\t\t\t  {}".format(classifyG(file, fileTest)))
-    print("classifyCART:\t\t\t\t\t\t\t  {}".format(classifyCART(file, fileTest)))
-    print("classifyIG predicted 8/10 classes correctly")
-    print("classifyG predicted 3/10 classes correctly")
-    print("classifyCART predicted 3/10 classes correctly")
+	y_actual = test[1][:, -1].tolist()
+	y_predict_IG = classifyIG(train, test)
+	y_predict_G = classifyG(train, test)
+	y_predict_CART = classifyCART(train, test)
+
+	print("\n")
+
+	print("Predicted classes: my results:")
+	print("I", y_predict_IG, " accuracy: ", calculate_accuracy(y_predict_IG, y_actual))
+	print("G", y_predict_G, " accuracy: ", calculate_accuracy(y_predict_G, y_actual))
+	print("C", y_predict_CART, " accuracy: ", calculate_accuracy(y_predict_CART, y_actual))
     exit()
 
 if __name__=="__main__":
@@ -533,3 +311,27 @@ if __name__=="__main__":
     a function.
     """
     main()
+
+	# compare my results to scikit-learn's decision tree
+
+	D_train = load("train.txt")
+	D_test = load("test.txt")
+
+	clf_gini = DecisionTreeClassifier(criterion="gini", max_depth=1)
+	clf_entropy = DecisionTreeClassifier(criterion="entropy", max_depth=1)
+
+	clf_gini.fit(X=D_train[0], y=D_train[1])
+	clf_entropy.fit(X=D_train[0], y=D_train[1])
+
+	y_gini = clf_gini.predict(D_test[0])
+	y_entropy = clf_gini.predict(D_test[0])
+
+	print("\n\n")
+
+	print("Predicted classes: sklearn's decision tree:\n")
+
+	print("criterion='entropy', max_depth=1:")
+	print("I",y_entropy.tolist(), "accuracy: ", calculate_accuracy(y_entropy, D_test[1]))
+
+	print("\ncriterion='gini', max_depth=1:")
+	print("G",y_entropy.tolist(), "accuracy: ", calculate_accuracy(y_gini, D_test[1]))
